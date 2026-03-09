@@ -7,36 +7,86 @@ require "ISUI/ISInventoryPane"
 require "ISUI/ISScrollingListBox"
 require "ISUI/ISTextEntryBox"
 
-BoxxyAutoLoot = BoxxyAutoLoot or {}
-BoxxyAutoLoot.modDataKey = "BoxxyAutoLoot"
-BoxxyAutoLoot.windowTitle = "Quick Loot List"
-BoxxyAutoLoot.windows = BoxxyAutoLoot.windows or {}
+BoxxyQuickLoot = BoxxyQuickLoot or {}
+BoxxyQuickLoot.modDataKey = "BoxxyQuickLoot"
+BoxxyQuickLoot.windowTitle = "Quick Loot List"
+BoxxyQuickLoot.windows = BoxxyQuickLoot.windows or {}
 
-if not BoxxyAutoLoot.options and PZAPI and PZAPI.ModOptions then
-    BoxxyAutoLoot.options = PZAPI.ModOptions:create("BoxxyAutoLoot", "Boxxy Quick Loot")
-    BoxxyAutoLoot.autoLootKeyOption = BoxxyAutoLoot.options:addKeyBind(
-        "BoxxyAutoLoot_triggerAutoLoot",
+if not BoxxyQuickLoot.options and PZAPI and PZAPI.ModOptions then
+    BoxxyQuickLoot.options = PZAPI.ModOptions:create("BoxxyQuickLoot", "Boxxy Quick Loot")
+    BoxxyQuickLoot.autoLootKeyOption = BoxxyQuickLoot.options:addKeyBind(
+        "BoxxyQuickLoot_triggerAutoLoot",
         "Quick Loot",
         Keyboard.KEY_NONE,
-        "Trigger quick loot on the active loot window."
+        "Trigger Quick Loot on the active loot window."
     )
 end
 
 local FONT_HGT_SMALL = getTextManager():getFontHeight(UIFont.Small)
+local FONT_HGT_MEDIUM = getTextManager():getFontHeight(UIFont.Medium)
 
-BoxxyAutoLootWindow = ISCollapsableWindow:derive("BoxxyAutoLootWindow")
-BoxxyAutoLootWindow.removeButtonWidth = 72
-BoxxyAutoLootWindow.toggleButtonWidth = 72
-BoxxyAutoLootWindow.addTermButtonWidth = 110
+BoxxyQuickLootWindow = ISCollapsableWindow:derive("BoxxyQuickLootWindow")
+BoxxyQuickLootWindow.removeButtonWidth = 72
+BoxxyQuickLootWindow.toggleButtonWidth = 72
+BoxxyQuickLootWindow.addTermButtonWidth = 110
+BoxxyQuickLootWindow.actionButtonGap = 8
+BoxxyQuickLootWindow.actionRightPadding = 28
+BoxxyQuickLootWindow.helpButtonSize = 18
+BoxxyQuickLootWindow.frameBackground = { r = 0.12, g = 0.12, b = 0.12, a = 0.96 }
+BoxxyQuickLootWindow.frameBorder = { r = 0.3, g = 0.3, b = 0.3, a = 1.0 }
+BoxxyQuickLootWindow.titleBarBackground = { r = 0.16, g = 0.16, b = 0.16, a = 0.98 }
+BoxxyQuickLootWindow.titleBarBorder = { r = 0.34, g = 0.34, b = 0.34, a = 0.9 }
+BoxxyQuickLootWindow.titleText = { r = 0.9, g = 0.9, b = 0.9, a = 1.0 }
+BoxxyQuickLootWindow.surfaceBackground = { r = 0.15, g = 0.15, b = 0.15, a = 0.92 }
+BoxxyQuickLootWindow.surfaceBorder = { r = 0.32, g = 0.32, b = 0.32, a = 0.86 }
+BoxxyQuickLootWindow.scrollbarBackground = { r = 0.18, g = 0.18, b = 0.18, a = 0.92 }
+BoxxyQuickLootWindow.scrollbarBorder = { r = 0.36, g = 0.36, b = 0.36, a = 0.9 }
 
-function BoxxyAutoLoot.getPlayerObject(playerRef)
+function BoxxyQuickLoot.copyColor(target, source)
+    if not target or not source then
+        return
+    end
+
+    target.r = source.r
+    target.g = source.g
+    target.b = source.b
+    target.a = source.a
+end
+
+function BoxxyQuickLoot.applyButtonPalette(button, background, hover, border, text)
+    if not button then
+        return
+    end
+
+    button.backgroundColor = button.backgroundColor or {}
+    button.backgroundColorMouseOver = button.backgroundColorMouseOver or {}
+    button.borderColor = button.borderColor or {}
+    BoxxyQuickLoot.copyColor(button.backgroundColor, background)
+    BoxxyQuickLoot.copyColor(button.backgroundColorMouseOver, hover)
+    BoxxyQuickLoot.copyColor(button.borderColor, border)
+    if text then
+        button.textColor = button.textColor or {}
+        BoxxyQuickLoot.copyColor(button.textColor, text)
+    end
+end
+
+function BoxxyQuickLoot.getMatchSyntaxTooltip()
+    return "Match syntax:\n" ..
+        "Plain text: chips\n" ..
+        "+ means AND: baseball + bat\n" ..
+        "| means OR: baseball | bat\n" ..
+        "- excludes text: baseball -bat\n" ..
+        "Operators can be combined in one rule."
+end
+
+function BoxxyQuickLoot.getPlayerObject(playerRef)
     if type(playerRef) == "number" then
         return getSpecificPlayer(playerRef)
     end
     return playerRef
 end
 
-function BoxxyAutoLoot.getPlayerNumber(playerRef)
+function BoxxyQuickLoot.getPlayerNumber(playerRef)
     if type(playerRef) == "number" then
         return playerRef
     end
@@ -46,29 +96,29 @@ function BoxxyAutoLoot.getPlayerNumber(playerRef)
     return 0
 end
 
-function BoxxyAutoLoot.getListStore(playerObj)
+function BoxxyQuickLoot.getListStore(playerObj)
     if not playerObj then
         return nil
     end
 
     local modData = playerObj:getModData()
-    modData[BoxxyAutoLoot.modDataKey] = modData[BoxxyAutoLoot.modDataKey] or {}
-    modData[BoxxyAutoLoot.modDataKey].items = modData[BoxxyAutoLoot.modDataKey].items or {}
-    return modData[BoxxyAutoLoot.modDataKey].items
+    modData[BoxxyQuickLoot.modDataKey] = modData[BoxxyQuickLoot.modDataKey] or {}
+    modData[BoxxyQuickLoot.modDataKey].items = modData[BoxxyQuickLoot.modDataKey].items or {}
+    return modData[BoxxyQuickLoot.modDataKey].items
 end
 
-function BoxxyAutoLoot.getTermStore(playerObj)
+function BoxxyQuickLoot.getTermStore(playerObj)
     if not playerObj then
         return nil
     end
 
     local modData = playerObj:getModData()
-    modData[BoxxyAutoLoot.modDataKey] = modData[BoxxyAutoLoot.modDataKey] or {}
-    modData[BoxxyAutoLoot.modDataKey].terms = modData[BoxxyAutoLoot.modDataKey].terms or {}
-    return modData[BoxxyAutoLoot.modDataKey].terms
+    modData[BoxxyQuickLoot.modDataKey] = modData[BoxxyQuickLoot.modDataKey] or {}
+    modData[BoxxyQuickLoot.modDataKey].terms = modData[BoxxyQuickLoot.modDataKey].terms or {}
+    return modData[BoxxyQuickLoot.modDataKey].terms
 end
 
-function BoxxyAutoLoot.saveList(playerObj)
+function BoxxyQuickLoot.saveList(playerObj)
     if not playerObj then
         return
     end
@@ -77,10 +127,10 @@ function BoxxyAutoLoot.saveList(playerObj)
         playerObj:transmitModData()
     end
 
-    BoxxyAutoLoot.refreshWindow(playerObj)
+    BoxxyQuickLoot.refreshWindow(playerObj)
 end
 
-function BoxxyAutoLoot.getDisplayName(itemOrFullType)
+function BoxxyQuickLoot.getDisplayName(itemOrFullType)
     if type(itemOrFullType) == "string" then
         return getItemNameFromFullType(itemOrFullType) or itemOrFullType
     end
@@ -92,28 +142,51 @@ function BoxxyAutoLoot.getDisplayName(itemOrFullType)
     return itemOrFullType:getDisplayName() or itemOrFullType:getName() or itemOrFullType:getFullType()
 end
 
-function BoxxyAutoLoot.getStoredEntryInfo(value, fallbackName)
+function BoxxyQuickLoot.getStoredEntryInfo(value, fallbackName)
     local name = fallbackName
     local enabled = true
+    local icon = nil
 
     if type(value) == "table" then
         name = value.name or value.label or fallbackName
         enabled = value.enabled ~= false
+        icon = value.icon
     elseif type(value) == "string" then
         name = value
     elseif value == false then
         enabled = false
     end
 
-    return name, enabled
+    return name, enabled, icon
 end
 
-function BoxxyAutoLoot.hasAnyStoredEntries(playerObj)
-    return BoxxyAutoLoot.tableHasEntries(BoxxyAutoLoot.getListStore(playerObj)) or
-        BoxxyAutoLoot.tableHasEntries(BoxxyAutoLoot.getTermStore(playerObj))
+function BoxxyQuickLoot.getItemIconPath(item)
+    if not item or not instanceof(item, "InventoryItem") then
+        return nil
+    end
+
+    local texture = item.getTex and item:getTex() or nil
+    if texture and texture.getName then
+        return texture:getName()
+    end
+
+    return nil
 end
 
-function BoxxyAutoLoot.normalizeSearchTerm(term)
+function BoxxyQuickLoot.getTextureFromPath(texturePath)
+    if type(texturePath) ~= "string" or texturePath == "" then
+        return nil
+    end
+
+    return getTexture(texturePath)
+end
+
+function BoxxyQuickLoot.hasAnyStoredEntries(playerObj)
+    return BoxxyQuickLoot.tableHasEntries(BoxxyQuickLoot.getListStore(playerObj)) or
+        BoxxyQuickLoot.tableHasEntries(BoxxyQuickLoot.getTermStore(playerObj))
+end
+
+function BoxxyQuickLoot.normalizeSearchTerm(term)
     if type(term) ~= "string" then
         return nil
     end
@@ -130,7 +203,7 @@ function BoxxyAutoLoot.normalizeSearchTerm(term)
     return normalized
 end
 
-function BoxxyAutoLoot.getDisplaySearchTerm(term)
+function BoxxyQuickLoot.getDisplaySearchTerm(term)
     if type(term) ~= "string" then
         return nil
     end
@@ -146,11 +219,101 @@ function BoxxyAutoLoot.getDisplaySearchTerm(term)
     return displayTerm
 end
 
-function BoxxyAutoLoot.getTermLabel(term)
-    return 'Contains: "' .. term .. '"'
+function BoxxyQuickLoot.getTermLabel(term)
+    return 'Match: "' .. term .. '"'
 end
 
-function BoxxyAutoLoot.getItemSearchText(item)
+function BoxxyQuickLoot.hasSearchOperators(term)
+    if type(term) ~= "string" then
+        return false
+    end
+
+    return string.find(term, "|", 1, true) ~= nil or string.find(term, "+", 1, true) ~= nil or
+        string.match(term, "^%-") ~= nil or string.match(term, "[%s|+]%-") ~= nil
+end
+
+function BoxxyQuickLoot.parseSearchExpression(term)
+    local normalizedTerm = BoxxyQuickLoot.normalizeSearchTerm(term)
+    if not normalizedTerm or not BoxxyQuickLoot.hasSearchOperators(normalizedTerm) then
+        return nil
+    end
+
+    local groups = {}
+
+    for rawGroup in string.gmatch(normalizedTerm, "[^|]+") do
+        local groupText = BoxxyQuickLoot.normalizeSearchTerm(rawGroup)
+        if groupText then
+            local group = {
+                include = {},
+                exclude = {},
+            }
+            local index = 1
+
+            while index <= #groupText do
+                local character = string.sub(groupText, index, index)
+                if character == " " or character == "+" then
+                    index = index + 1
+                else
+                    local isExcluded = false
+                    if character == "-" then
+                        isExcluded = true
+                        index = index + 1
+                        while index <= #groupText and string.sub(groupText, index, index) == " " do
+                            index = index + 1
+                        end
+                    end
+
+                    local tokenStart = index
+                    while index <= #groupText do
+                        character = string.sub(groupText, index, index)
+                        if character == " " or character == "+" then
+                            break
+                        end
+                        index = index + 1
+                    end
+
+                    local token = BoxxyQuickLoot.normalizeSearchTerm(string.sub(groupText, tokenStart, index - 1))
+                    if token then
+                        local tokenList = isExcluded and group.exclude or group.include
+                        table.insert(tokenList, token)
+                    end
+                end
+            end
+
+            if #group.include > 0 or #group.exclude > 0 then
+                table.insert(groups, group)
+            end
+        end
+    end
+
+    if #groups == 0 then
+        return nil
+    end
+
+    return groups
+end
+
+function BoxxyQuickLoot.matchesSearchGroup(group, searchText)
+    if type(group) ~= "table" or type(searchText) ~= "string" then
+        return false
+    end
+
+    for _, token in ipairs(group.include or {}) do
+        if string.find(searchText, token, 1, true) == nil then
+            return false
+        end
+    end
+
+    for _, token in ipairs(group.exclude or {}) do
+        if string.find(searchText, token, 1, true) ~= nil then
+            return false
+        end
+    end
+
+    return #(group.include or {}) > 0 or #(group.exclude or {}) > 0
+end
+
+function BoxxyQuickLoot.getItemSearchText(item)
     if not item or not instanceof(item, "InventoryItem") then
         return nil
     end
@@ -165,32 +328,51 @@ function BoxxyAutoLoot.getItemSearchText(item)
     return string.lower(table.concat(parts, " "))
 end
 
-function BoxxyAutoLoot.matchesSearchTerm(term, item)
-    local normalizedTerm = BoxxyAutoLoot.normalizeSearchTerm(term)
-    local searchText = BoxxyAutoLoot.getItemSearchText(item)
-    return normalizedTerm ~= nil and searchText ~= nil and string.find(searchText, normalizedTerm, 1, true) ~= nil
+function BoxxyQuickLoot.matchesSearchTerm(term, item)
+    local normalizedTerm = BoxxyQuickLoot.normalizeSearchTerm(term)
+    local searchText = BoxxyQuickLoot.getItemSearchText(item)
+    if normalizedTerm == nil or searchText == nil then
+        return false
+    end
+
+    local parsedExpression = BoxxyQuickLoot.parseSearchExpression(normalizedTerm)
+    if BoxxyQuickLoot.hasSearchOperators(normalizedTerm) then
+        if not parsedExpression then
+            return false
+        end
+
+        for _, group in ipairs(parsedExpression) do
+            if BoxxyQuickLoot.matchesSearchGroup(group, searchText) then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    return string.find(searchText, normalizedTerm, 1, true) ~= nil
 end
 
-function BoxxyAutoLoot.isExactTracked(playerObj, item)
-    local store = BoxxyAutoLoot.getListStore(playerObj)
-    local fullType = BoxxyAutoLoot.getItemFullType(item)
+function BoxxyQuickLoot.isExactTracked(playerObj, item)
+    local store = BoxxyQuickLoot.getListStore(playerObj)
+    local fullType = BoxxyQuickLoot.getItemFullType(item)
     if store == nil or fullType == nil or store[fullType] == nil then
         return false
     end
 
-    local _, enabled = BoxxyAutoLoot.getStoredEntryInfo(store[fullType], BoxxyAutoLoot.getDisplayName(fullType))
+    local _, enabled = BoxxyQuickLoot.getStoredEntryInfo(store[fullType], BoxxyQuickLoot.getDisplayName(fullType))
     return enabled
 end
 
-function BoxxyAutoLoot.findMatchingTerm(playerObj, item)
-    local terms = BoxxyAutoLoot.getTermStore(playerObj)
+function BoxxyQuickLoot.findMatchingTerm(playerObj, item)
+    local terms = BoxxyQuickLoot.getTermStore(playerObj)
     if type(terms) ~= "table" then
         return nil
     end
 
     for term, value in pairs(terms) do
-        local _, enabled = BoxxyAutoLoot.getStoredEntryInfo(value, term)
-        if enabled and BoxxyAutoLoot.matchesSearchTerm(term, item) then
+        local _, enabled = BoxxyQuickLoot.getStoredEntryInfo(value, term)
+        if enabled and BoxxyQuickLoot.matchesSearchTerm(term, item) then
             return term
         end
     end
@@ -198,13 +380,13 @@ function BoxxyAutoLoot.findMatchingTerm(playerObj, item)
     return nil
 end
 
-function BoxxyAutoLoot.hasTrackedItems(playerObj)
-    local store = BoxxyAutoLoot.getListStore(playerObj)
-    local terms = BoxxyAutoLoot.getTermStore(playerObj)
+function BoxxyQuickLoot.hasTrackedItems(playerObj)
+    local store = BoxxyQuickLoot.getListStore(playerObj)
+    local terms = BoxxyQuickLoot.getTermStore(playerObj)
 
     if type(store) == "table" then
         for fullType, value in pairs(store) do
-            local _, enabled = BoxxyAutoLoot.getStoredEntryInfo(value, BoxxyAutoLoot.getDisplayName(fullType))
+            local _, enabled = BoxxyQuickLoot.getStoredEntryInfo(value, BoxxyQuickLoot.getDisplayName(fullType))
             if enabled then
                 return true
             end
@@ -213,7 +395,7 @@ function BoxxyAutoLoot.hasTrackedItems(playerObj)
 
     if type(terms) == "table" then
         for term, value in pairs(terms) do
-            local _, enabled = BoxxyAutoLoot.getStoredEntryInfo(value, term)
+            local _, enabled = BoxxyQuickLoot.getStoredEntryInfo(value, term)
             if enabled then
                 return true
             end
@@ -223,12 +405,12 @@ function BoxxyAutoLoot.hasTrackedItems(playerObj)
     return false
 end
 
-function BoxxyAutoLoot.isTracked(playerObj, item)
-    return BoxxyAutoLoot.isExactTracked(playerObj, item) or BoxxyAutoLoot.findMatchingTerm(playerObj, item) ~= nil
+function BoxxyQuickLoot.isTracked(playerObj, item)
+    return BoxxyQuickLoot.isExactTracked(playerObj, item) or BoxxyQuickLoot.findMatchingTerm(playerObj, item) ~= nil
 end
 
-function BoxxyAutoLoot.addItems(playerObj, items)
-    local store = BoxxyAutoLoot.getListStore(playerObj)
+function BoxxyQuickLoot.addItems(playerObj, items)
+    local store = BoxxyQuickLoot.getListStore(playerObj)
     if not store then
         return
     end
@@ -236,17 +418,18 @@ function BoxxyAutoLoot.addItems(playerObj, items)
     for _, item in ipairs(items) do
         if item then
             store[item:getFullType()] = {
-                name = BoxxyAutoLoot.getDisplayName(item),
+                name = BoxxyQuickLoot.getDisplayName(item),
                 enabled = true,
+                icon = BoxxyQuickLoot.getItemIconPath(item),
             }
         end
     end
 
-    BoxxyAutoLoot.saveList(playerObj)
+    BoxxyQuickLoot.saveList(playerObj)
 end
 
-function BoxxyAutoLoot.removeItems(playerObj, items)
-    local store = BoxxyAutoLoot.getListStore(playerObj)
+function BoxxyQuickLoot.removeItems(playerObj, items)
+    local store = BoxxyQuickLoot.getListStore(playerObj)
     if not store then
         return
     end
@@ -257,23 +440,23 @@ function BoxxyAutoLoot.removeItems(playerObj, items)
         end
     end
 
-    BoxxyAutoLoot.saveList(playerObj)
+    BoxxyQuickLoot.saveList(playerObj)
 end
 
-function BoxxyAutoLoot.removeFullType(playerObj, fullType)
-    local store = BoxxyAutoLoot.getListStore(playerObj)
+function BoxxyQuickLoot.removeFullType(playerObj, fullType)
+    local store = BoxxyQuickLoot.getListStore(playerObj)
     if not store then
         return
     end
 
     store[fullType] = nil
-    BoxxyAutoLoot.saveList(playerObj)
+    BoxxyQuickLoot.saveList(playerObj)
 end
 
-function BoxxyAutoLoot.addSearchTerm(playerObj, term)
-    local normalizedTerm = BoxxyAutoLoot.normalizeSearchTerm(term)
-    local displayTerm = BoxxyAutoLoot.getDisplaySearchTerm(term)
-    local terms = BoxxyAutoLoot.getTermStore(playerObj)
+function BoxxyQuickLoot.addSearchTerm(playerObj, term)
+    local normalizedTerm = BoxxyQuickLoot.normalizeSearchTerm(term)
+    local displayTerm = BoxxyQuickLoot.getDisplaySearchTerm(term)
+    local terms = BoxxyQuickLoot.getTermStore(playerObj)
     if not normalizedTerm or not displayTerm or not terms then
         return false
     end
@@ -282,66 +465,67 @@ function BoxxyAutoLoot.addSearchTerm(playerObj, term)
         label = displayTerm,
         enabled = true,
     }
-    BoxxyAutoLoot.saveList(playerObj)
+    BoxxyQuickLoot.saveList(playerObj)
     return true
 end
 
-function BoxxyAutoLoot.removeSearchTerm(playerObj, term)
-    local normalizedTerm = BoxxyAutoLoot.normalizeSearchTerm(term)
-    local terms = BoxxyAutoLoot.getTermStore(playerObj)
+function BoxxyQuickLoot.removeSearchTerm(playerObj, term)
+    local normalizedTerm = BoxxyQuickLoot.normalizeSearchTerm(term)
+    local terms = BoxxyQuickLoot.getTermStore(playerObj)
     if not normalizedTerm or not terms then
         return
     end
 
     terms[normalizedTerm] = nil
-    BoxxyAutoLoot.saveList(playerObj)
+    BoxxyQuickLoot.saveList(playerObj)
 end
 
-function BoxxyAutoLoot.setFullTypeEnabled(playerObj, fullType, enabled)
-    local store = BoxxyAutoLoot.getListStore(playerObj)
+function BoxxyQuickLoot.setFullTypeEnabled(playerObj, fullType, enabled)
+    local store = BoxxyQuickLoot.getListStore(playerObj)
     if not store or not fullType or store[fullType] == nil then
         return
     end
 
-    local name = BoxxyAutoLoot.getStoredEntryInfo(store[fullType], BoxxyAutoLoot.getDisplayName(fullType))
+    local name, _, icon = BoxxyQuickLoot.getStoredEntryInfo(store[fullType], BoxxyQuickLoot.getDisplayName(fullType))
     store[fullType] = {
         name = name,
         enabled = enabled ~= false,
+        icon = icon,
     }
-    BoxxyAutoLoot.saveList(playerObj)
+    BoxxyQuickLoot.saveList(playerObj)
 end
 
-function BoxxyAutoLoot.setSearchTermEnabled(playerObj, term, enabled)
-    local normalizedTerm = BoxxyAutoLoot.normalizeSearchTerm(term)
-    local terms = BoxxyAutoLoot.getTermStore(playerObj)
+function BoxxyQuickLoot.setSearchTermEnabled(playerObj, term, enabled)
+    local normalizedTerm = BoxxyQuickLoot.normalizeSearchTerm(term)
+    local terms = BoxxyQuickLoot.getTermStore(playerObj)
     if not normalizedTerm or not terms or terms[normalizedTerm] == nil then
         return
     end
 
-    local label = BoxxyAutoLoot.getStoredEntryInfo(terms[normalizedTerm], normalizedTerm)
+    local label = BoxxyQuickLoot.getStoredEntryInfo(terms[normalizedTerm], normalizedTerm)
     terms[normalizedTerm] = {
         label = label,
         enabled = enabled ~= false,
     }
-    BoxxyAutoLoot.saveList(playerObj)
+    BoxxyQuickLoot.saveList(playerObj)
 end
 
-function BoxxyAutoLoot.toggleEntryEnabled(playerObj, entry)
+function BoxxyQuickLoot.toggleEntryEnabled(playerObj, entry)
     if not playerObj or not entry or entry.empty then
         return
     end
 
     local newEnabled = entry.enabled == false
     if entry.entryType == "term" then
-        BoxxyAutoLoot.setSearchTermEnabled(playerObj, entry.term, newEnabled)
+        BoxxyQuickLoot.setSearchTermEnabled(playerObj, entry.term, newEnabled)
     else
-        BoxxyAutoLoot.setFullTypeEnabled(playerObj, entry.fullType, newEnabled)
+        BoxxyQuickLoot.setFullTypeEnabled(playerObj, entry.fullType, newEnabled)
     end
 end
 
-function BoxxyAutoLoot.getSortedEntries(playerObj)
-    local store = BoxxyAutoLoot.getListStore(playerObj)
-    local terms = BoxxyAutoLoot.getTermStore(playerObj)
+function BoxxyQuickLoot.getSortedEntries(playerObj)
+    local store = BoxxyQuickLoot.getListStore(playerObj)
+    local terms = BoxxyQuickLoot.getTermStore(playerObj)
     local entries = {}
 
     if not store and not terms then
@@ -350,23 +534,24 @@ function BoxxyAutoLoot.getSortedEntries(playerObj)
 
     if store then
         for fullType, value in pairs(store) do
-            local name, enabled = BoxxyAutoLoot.getStoredEntryInfo(value, BoxxyAutoLoot.getDisplayName(fullType))
+            local name, enabled, icon = BoxxyQuickLoot.getStoredEntryInfo(value, BoxxyQuickLoot.getDisplayName(fullType))
             table.insert(entries, {
                 entryType = "item",
                 fullType = fullType,
-                name = name or BoxxyAutoLoot.getDisplayName(fullType),
+                name = name or BoxxyQuickLoot.getDisplayName(fullType),
                 enabled = enabled,
+                icon = icon,
             })
         end
     end
 
     if terms then
         for term, value in pairs(terms) do
-            local label, enabled = BoxxyAutoLoot.getStoredEntryInfo(value, term)
+            local label, enabled = BoxxyQuickLoot.getStoredEntryInfo(value, term)
             table.insert(entries, {
                 entryType = "term",
                 term = term,
-                name = BoxxyAutoLoot.getTermLabel(label or term),
+                name = BoxxyQuickLoot.getTermLabel(label or term),
                 rawName = label or term,
                 enabled = enabled,
             })
@@ -380,7 +565,7 @@ function BoxxyAutoLoot.getSortedEntries(playerObj)
     return entries
 end
 
-function BoxxyAutoLoot.getContextItems(items)
+function BoxxyQuickLoot.getContextItems(items)
     if not items or #items == 0 then
         return {}
     end
@@ -388,7 +573,7 @@ function BoxxyAutoLoot.getContextItems(items)
     return ISInventoryPane.getActualItems(items)
 end
 
-function BoxxyAutoLoot.getListRowItem(rowEntry)
+function BoxxyQuickLoot.getListRowItem(rowEntry)
     if not rowEntry then
         return nil
     end
@@ -404,7 +589,7 @@ function BoxxyAutoLoot.getListRowItem(rowEntry)
     return nil
 end
 
-function BoxxyAutoLoot.getItemFullType(item)
+function BoxxyQuickLoot.getItemFullType(item)
     if not item or not instanceof(item, "InventoryItem") or item.getFullType == nil then
         return nil
     end
@@ -412,7 +597,7 @@ function BoxxyAutoLoot.getItemFullType(item)
     return item:getFullType()
 end
 
-function BoxxyAutoLoot.tableHasEntries(value)
+function BoxxyQuickLoot.tableHasEntries(value)
     if type(value) ~= "table" then
         return false
     end
@@ -430,19 +615,19 @@ function BoxxyAutoLoot.tableHasEntries(value)
     return false
 end
 
-function BoxxyAutoLoot.collectTrackedItems(playerObj, inventory)
+function BoxxyQuickLoot.collectTrackedItems(playerObj, inventory)
     local matches = {}
     local heavyItem = nil
     local totalMatches = 0
 
-    if not inventory or not BoxxyAutoLoot.hasTrackedItems(playerObj) then
+    if not inventory or not BoxxyQuickLoot.hasTrackedItems(playerObj) then
         return matches, heavyItem, totalMatches
     end
 
     local items = inventory:getItems()
     for index = 0, items:size() - 1 do
         local item = items:get(index)
-        if BoxxyAutoLoot.isTracked(playerObj, item) then
+        if BoxxyQuickLoot.isTracked(playerObj, item) then
             totalMatches = totalMatches + 1
             if isForceDropHeavyItem(item) then
                 heavyItem = item
@@ -455,15 +640,15 @@ function BoxxyAutoLoot.collectTrackedItems(playerObj, inventory)
     return matches, heavyItem, totalMatches
 end
 
-function BoxxyAutoLoot.containerHasTrackedItems(playerObj, inventory)
-    if not inventory or not BoxxyAutoLoot.hasTrackedItems(playerObj) then
+function BoxxyQuickLoot.containerHasTrackedItems(playerObj, inventory)
+    if not inventory or not BoxxyQuickLoot.hasTrackedItems(playerObj) then
         return false
     end
 
     local items = inventory:getItems()
     for index = 0, items:size() - 1 do
         local item = items:get(index)
-        if BoxxyAutoLoot.isTracked(playerObj, item) then
+        if BoxxyQuickLoot.isTracked(playerObj, item) then
             return true
         end
     end
@@ -471,16 +656,61 @@ function BoxxyAutoLoot.containerHasTrackedItems(playerObj, inventory)
     return false
 end
 
-function BoxxyAutoLoot.showListWindow(playerRef)
-    local playerObj = BoxxyAutoLoot.getPlayerObject(playerRef)
+function BoxxyQuickLoot.getLootButtonState(playerObj, inventory)
+    if not BoxxyQuickLoot.hasAnyStoredEntries(playerObj) then
+        return true, "No quick loot entries yet. Click to open the list."
+    end
+
+    if BoxxyQuickLoot.containerHasTrackedItems(playerObj, inventory) then
+        return true, nil
+    end
+
+    if BoxxyQuickLoot.hasTrackedItems(playerObj) then
+        return false, "No matching items in this container."
+    end
+
+    if BoxxyQuickLoot.hasAnyStoredEntries(playerObj) then
+        return false, "Enable auto loot entries first."
+    end
+
+    return false, "Add items to the auto loot list first."
+end
+
+function BoxxyQuickLoot.applyLootButtonState(control, buttonEnabled, tooltip)
+    if not control then
+        return
+    end
+
+    control:setEnable(buttonEnabled)
+    control.tooltip = tooltip
+
+    if not control.borderColor then
+        return
+    end
+    if buttonEnabled then
+        control.borderColor.r = 0.45
+        control.borderColor.g = 0.45
+        control.borderColor.b = 0.45
+        control.borderColor.a = 0.9
+        return
+    end
+
+    control.borderColor.r = 0
+    control.borderColor.g = 0
+    control.borderColor.b = 0
+    control.borderColor.a = 1.0
+end
+
+function BoxxyQuickLoot.showListWindow(playerRef)
+    local playerObj = BoxxyQuickLoot.getPlayerObject(playerRef)
     if not playerObj then
         return
     end
 
-    BoxxyAutoLoot.windows = BoxxyAutoLoot.windows or {}
+    BoxxyQuickLoot.windows = BoxxyQuickLoot.windows or {}
 
-    local playerNum = BoxxyAutoLoot.getPlayerNumber(playerObj)
-    local window = BoxxyAutoLoot.windows[playerNum]
+    local playerNum = BoxxyQuickLoot.getPlayerNumber(playerObj)
+    local window = BoxxyQuickLoot.windows[playerNum]
     if window then
         window:refreshList()
         window:setVisible(true)
@@ -489,33 +719,41 @@ function BoxxyAutoLoot.showListWindow(playerRef)
         return
     end
 
-    window = BoxxyAutoLootWindow:new(playerObj)
+    window = BoxxyQuickLootWindow:new(playerObj)
     window:initialise()
     window:addToUIManager()
     window:setVisible(true)
     window:bringToTop()
-    BoxxyAutoLoot.windows[playerNum] = window
+    BoxxyQuickLoot.windows[playerNum] = window
 end
 
-function BoxxyAutoLoot.refreshWindow(playerRef)
-    local playerNum = BoxxyAutoLoot.getPlayerNumber(playerRef)
-    local window = BoxxyAutoLoot.windows and BoxxyAutoLoot.windows[playerNum] or nil
+function BoxxyQuickLoot.refreshWindow(playerRef)
+    local playerNum = BoxxyQuickLoot.getPlayerNumber(playerRef)
+    local window = BoxxyQuickLoot.windows and BoxxyQuickLoot.windows[playerNum] or nil
     if window then
         window:refreshList()
     end
 end
 
-function BoxxyAutoLoot.onAddToList(playerObj, items)
-    BoxxyAutoLoot.addItems(playerObj, items)
+function BoxxyQuickLoot.onAddToList(playerObj, items)
+    BoxxyQuickLoot.addItems(playerObj, items)
 end
 
-function BoxxyAutoLoot.onRemoveFromList(playerObj, items)
-    BoxxyAutoLoot.removeItems(playerObj, items)
+function BoxxyQuickLoot.onRemoveFromList(playerObj, items)
+    BoxxyQuickLoot.removeItems(playerObj, items)
 end
 
-function BoxxyAutoLoot.onFillInventoryObjectContextMenu(playerNum, context, items)
+function BoxxyQuickLoot.getContextMenuIcon()
+    if BoxxyQuickLoot.contextMenuIcon == nil then
+        BoxxyQuickLoot.contextMenuIcon = getTexture("contexticon.png")
+    end
+
+    return BoxxyQuickLoot.contextMenuIcon
+end
+
+function BoxxyQuickLoot.onFillInventoryObjectContextMenu(playerNum, context, items)
     local playerObj = getSpecificPlayer(playerNum)
-    local actualItems = BoxxyAutoLoot.getContextItems(items)
+    local actualItems = BoxxyQuickLoot.getContextItems(items)
     if not playerObj or #actualItems == 0 then
         return
     end
@@ -524,7 +762,7 @@ function BoxxyAutoLoot.onFillInventoryObjectContextMenu(playerNum, context, item
     local anyUntracked = false
 
     for _, item in ipairs(actualItems) do
-        if BoxxyAutoLoot.isExactTracked(playerObj, item) then
+        if BoxxyQuickLoot.isExactTracked(playerObj, item) then
             anyTracked = true
         else
             anyUntracked = true
@@ -532,22 +770,28 @@ function BoxxyAutoLoot.onFillInventoryObjectContextMenu(playerNum, context, item
     end
 
     local option = context:addOption("Quick Loot")
+    option.iconTexture = BoxxyQuickLoot.getContextMenuIcon()
     local subMenu = context:getNew(context)
     context:addSubMenu(option, subMenu)
 
     if anyUntracked then
-        subMenu:addOption("Add to list", playerObj, BoxxyAutoLoot.onAddToList, actualItems)
+        subMenu:addOption("Add to list", playerObj, BoxxyQuickLoot.onAddToList, actualItems)
     end
     if anyTracked then
-        subMenu:addOption("Remove from list", playerObj, BoxxyAutoLoot.onRemoveFromList, actualItems)
+        subMenu:addOption("Remove from list", playerObj, BoxxyQuickLoot.onRemoveFromList, actualItems)
     end
-    subMenu:addOption("Show list", playerNum, BoxxyAutoLoot.showListWindow)
+    subMenu:addOption("Show list", playerNum, BoxxyQuickLoot.showListWindow)
 end
 
-function BoxxyAutoLoot.onAutoLootClicked(page)
+function BoxxyQuickLoot.onAutoLootClicked(page)
     local playerObj = getSpecificPlayer(page.player)
     local inventory = page.inventoryPane and page.inventoryPane.inventory or nil
     if not playerObj or not inventory then
+        return
+    end
+
+    if not BoxxyQuickLoot.hasAnyStoredEntries(playerObj) then
+        BoxxyQuickLoot.showListWindow(playerObj)
         return
     end
 
@@ -555,7 +799,7 @@ function BoxxyAutoLoot.onAutoLootClicked(page)
         return
     end
 
-    local items, heavyItem, totalMatches = BoxxyAutoLoot.collectTrackedItems(playerObj, inventory)
+    local items, heavyItem, totalMatches = BoxxyQuickLoot.collectTrackedItems(playerObj, inventory)
     local playerInventory = getPlayerInventory(page.player).inventory
 
     if heavyItem and totalMatches == 1 and #items == 0 then
@@ -573,7 +817,7 @@ function BoxxyAutoLoot.onAutoLootClicked(page)
     getPlayerInventory(page.player).inventoryPane.selected = {}
 end
 
-function BoxxyAutoLoot.isVisibleUiElement(uiElement)
+function BoxxyQuickLoot.isVisibleUiElement(uiElement)
     if not uiElement then
         return false
     end
@@ -589,14 +833,21 @@ function BoxxyAutoLoot.isVisibleUiElement(uiElement)
     return uiElement.visible == true
 end
 
-function BoxxyAutoLoot.canTriggerAutoLoot(page)
-    return BoxxyAutoLoot.isVisibleUiElement(page) and BoxxyAutoLoot.shouldShowLootActionForPage(page)
+function BoxxyQuickLoot.canTriggerAutoLoot(page)
+    if not BoxxyQuickLoot.isVisibleUiElement(page) or not BoxxyQuickLoot.shouldShowLootActionForPage(page) then
+        return false
+    end
+
+    local playerObj = getSpecificPlayer(page.player)
+    local inventory = page.inventoryPane and page.inventoryPane.inventory or nil
+    local buttonEnabled = BoxxyQuickLoot.getLootButtonState(playerObj, inventory)
+    return buttonEnabled
 end
 
-function BoxxyAutoLoot.getActiveLootPage()
+function BoxxyQuickLoot.getActiveLootPage()
     for playerNum = 0, 3 do
         local lootPage = getPlayerLoot(playerNum)
-        if BoxxyAutoLoot.canTriggerAutoLoot(lootPage) then
+        if BoxxyQuickLoot.canTriggerAutoLoot(lootPage) then
             return lootPage
         end
     end
@@ -604,8 +855,8 @@ function BoxxyAutoLoot.getActiveLootPage()
     return nil
 end
 
-function BoxxyAutoLoot.onAutoLootKeyPressed(key)
-    local keyOption = BoxxyAutoLoot.autoLootKeyOption
+function BoxxyQuickLoot.onAutoLootKeyPressed(key)
+    local keyOption = BoxxyQuickLoot.autoLootKeyOption
     if not getPlayer() or not keyOption then
         return
     end
@@ -615,18 +866,18 @@ function BoxxyAutoLoot.onAutoLootKeyPressed(key)
         return
     end
 
-    local lootPage = BoxxyAutoLoot.getActiveLootPage()
+    local lootPage = BoxxyQuickLoot.getActiveLootPage()
     if lootPage then
-        BoxxyAutoLoot.onAutoLootClicked(lootPage)
+        BoxxyQuickLoot.onAutoLootClicked(lootPage)
     end
 end
 
-function BoxxyAutoLoot.hasCleanUILootControls()
+function BoxxyQuickLoot.hasCleanUILootControls()
     return ISLootWindowContainerControls ~= nil and ISLootWindowContainerControls.AddHandler ~= nil and
         ISLootWindowObjectControlHandler ~= nil and ISLootWindowFloorControlHandler ~= nil
 end
 
-function BoxxyAutoLoot.shouldShowLootActionForPage(page)
+function BoxxyQuickLoot.shouldShowLootActionForPage(page)
     if not page or page.onCharacter then
         return false
     end
@@ -638,28 +889,34 @@ function BoxxyAutoLoot.shouldShowLootActionForPage(page)
     end
 
     local items = inventory:getItems()
-    return items ~= nil and not items:isEmpty() and BoxxyAutoLoot.hasTrackedItems(playerObj)
+    return items ~= nil and not items:isEmpty()
 end
 
-function BoxxyAutoLoot.registerCleanUIHandler()
-    if not BoxxyAutoLoot.hasCleanUILootControls() or BoxxyAutoLoot.cleanUIHandlerRegistered then
+function BoxxyQuickLoot.registerCleanUIHandler()
+    if not BoxxyQuickLoot.hasCleanUILootControls() or BoxxyQuickLoot.cleanUIHandlerRegistered then
         return
     end
 
-    ISLootWindowObjectControlHandler_BoxxyAutoLoot = ISLootWindowObjectControlHandler:derive(
-        "ISLootWindowObjectControlHandler_BoxxyAutoLoot")
-    local ObjectHandler = ISLootWindowObjectControlHandler_BoxxyAutoLoot
+    ISLootWindowObjectControlHandler_BoxxyQuickLoot = ISLootWindowObjectControlHandler:derive(
+        "ISLootWindowObjectControlHandler_BoxxyQuickLoot")
+    local ObjectHandler = ISLootWindowObjectControlHandler_BoxxyQuickLoot
 
     function ObjectHandler:shouldBeVisible()
-        return BoxxyAutoLoot.shouldShowLootActionForPage(self.lootWindow)
+        return BoxxyQuickLoot.shouldShowLootActionForPage(self.lootWindow)
     end
 
     function ObjectHandler:getControl()
-        return self:getButtonControl("quick loot")
+        local control = self:getButtonControl("Quick Loot")
+        local playerObj = self.lootWindow and getSpecificPlayer(self.lootWindow.player) or nil
+        local inventory = self.lootWindow and self.lootWindow.inventoryPane and self.lootWindow.inventoryPane.inventory or
+            nil
+        local buttonEnabled, tooltip = BoxxyQuickLoot.getLootButtonState(playerObj, inventory)
+        BoxxyQuickLoot.applyLootButtonState(control, buttonEnabled, tooltip)
+        return control
     end
 
     function ObjectHandler:perform()
-        BoxxyAutoLoot.onAutoLootClicked(self.lootWindow)
+        BoxxyQuickLoot.onAutoLootClicked(self.lootWindow)
     end
 
     function ObjectHandler:new()
@@ -668,49 +925,55 @@ function BoxxyAutoLoot.registerCleanUIHandler()
         return o
     end
 
-    ISLootWindowFloorControlHandler_BoxxyAutoLoot = ISLootWindowFloorControlHandler:derive(
-        "ISLootWindowFloorControlHandler_BoxxyAutoLoot")
-    local FloorHandler = ISLootWindowFloorControlHandler_BoxxyAutoLoot
+    ISLootWindowFloorControlHandler_BoxxyQuickLoot = ISLootWindowFloorControlHandler:derive(
+        "ISLootWindowFloorControlHandler_BoxxyQuickLoot")
+    local FloorHandler = ISLootWindowFloorControlHandler_BoxxyQuickLoot
 
     function FloorHandler:shouldBeVisible()
-        return BoxxyAutoLoot.shouldShowLootActionForPage(self.lootWindow)
+        return BoxxyQuickLoot.shouldShowLootActionForPage(self.lootWindow)
     end
 
     function FloorHandler:getControl()
-        return self:getButtonControl("quick loot")
+        local control = self:getButtonControl("Quick Loot")
+        local playerObj = self.lootWindow and getSpecificPlayer(self.lootWindow.player) or nil
+        local inventory = self.lootWindow and self.lootWindow.inventoryPane and self.lootWindow.inventoryPane.inventory or
+            nil
+        local buttonEnabled, tooltip = BoxxyQuickLoot.getLootButtonState(playerObj, inventory)
+        BoxxyQuickLoot.applyLootButtonState(control, buttonEnabled, tooltip)
+        return control
     end
 
     function FloorHandler:perform()
-        BoxxyAutoLoot.onAutoLootClicked(self.lootWindow)
+        BoxxyQuickLoot.onAutoLootClicked(self.lootWindow)
     end
 
     function FloorHandler:new()
         return ISLootWindowFloorControlHandler.new(self)
     end
 
-    ISLootWindowContainerControls.AddHandler(ISLootWindowObjectControlHandler_BoxxyAutoLoot)
-    ISLootWindowContainerControls.AddFloorHandler(ISLootWindowFloorControlHandler_BoxxyAutoLoot)
-    BoxxyAutoLoot.cleanUIHandlerRegistered = true
+    ISLootWindowContainerControls.AddHandler(ISLootWindowObjectControlHandler_BoxxyQuickLoot)
+    ISLootWindowContainerControls.AddFloorHandler(ISLootWindowFloorControlHandler_BoxxyQuickLoot)
+    BoxxyQuickLoot.cleanUIHandlerRegistered = true
 end
 
-function BoxxyAutoLoot.isButtonControl(control)
+function BoxxyQuickLoot.isButtonControl(control)
     return type(control) == "table" and control.Type == "ISButton" and control.getRight ~= nil and
         control.getY ~= nil and control.getHeight ~= nil
 end
 
-function BoxxyAutoLoot.getLootAllControl(page)
+function BoxxyQuickLoot.getLootAllControl(page)
     if not page then
         return nil
     end
 
     local directControl = rawget(page, "lootAll")
-    if BoxxyAutoLoot.isButtonControl(directControl) then
+    if BoxxyQuickLoot.isButtonControl(directControl) then
         return directControl
     end
 
     local expectedTitle = getText("IGUI_invpage_Loot_all")
     for _, child in ipairs(page.children or {}) do
-        if BoxxyAutoLoot.isButtonControl(child) then
+        if BoxxyQuickLoot.isButtonControl(child) then
             local title = child.getTitle and child:getTitle() or child.title
             if title == expectedTitle or (child.onclick == ISInventoryPage.lootAll and child.target == page) then
                 return child
@@ -721,18 +984,18 @@ function BoxxyAutoLoot.getLootAllControl(page)
     return nil
 end
 
-function BoxxyAutoLoot.attachLootButton(page)
-    if not page or page.onCharacter or page.boxxyAutoLootButton or BoxxyAutoLoot.hasCleanUILootControls() then
+function BoxxyQuickLoot.attachLootButton(page)
+    if not page or page.onCharacter or page.BoxxyQuickLootButton or BoxxyQuickLoot.hasCleanUILootControls() then
         return
     end
 
-    local lootAllControl = BoxxyAutoLoot.getLootAllControl(page)
+    local lootAllControl = BoxxyQuickLoot.getLootAllControl(page)
     if not lootAllControl then
         return
     end
 
     local button = ISButton:new(lootAllControl:getRight() + 6, lootAllControl:getY(), 80, lootAllControl:getHeight(),
-        "quick loot", page, BoxxyAutoLoot.onAutoLootClicked)
+        "Quick Loot", page, BoxxyQuickLoot.onAutoLootClicked)
     button:initialise()
     button.borderColor.a = 0.0
     button.backgroundColor.a = 0.0
@@ -740,21 +1003,21 @@ function BoxxyAutoLoot.attachLootButton(page)
     button:setVisible(false)
     button:setWidthToTitle()
     page:addChild(button)
-    page.boxxyAutoLootButton = button
+    page.BoxxyQuickLootButton = button
 end
 
-function BoxxyAutoLoot.updateLootButton(page)
-    if BoxxyAutoLoot.hasCleanUILootControls() then
+function BoxxyQuickLoot.updateLootButton(page)
+    if BoxxyQuickLoot.hasCleanUILootControls() then
         return
     end
 
-    if not page or page.onCharacter or not page.boxxyAutoLootButton then
+    if not page or page.onCharacter or not page.BoxxyQuickLootButton then
         return
     end
 
-    local lootAllControl = BoxxyAutoLoot.getLootAllControl(page)
+    local lootAllControl = BoxxyQuickLoot.getLootAllControl(page)
     if not lootAllControl then
-        page.boxxyAutoLootButton:setVisible(false)
+        page.BoxxyQuickLootButton:setVisible(false)
         return
     end
 
@@ -763,28 +1026,26 @@ function BoxxyAutoLoot.updateLootButton(page)
     local shouldShow = lootAllControl:getIsVisible() and inventory ~= nil and inventory:getItems() and
         not inventory:getItems():isEmpty()
 
-    page.boxxyAutoLootButton:setVisible(shouldShow)
+    page.BoxxyQuickLootButton:setVisible(shouldShow)
     if not shouldShow then
         return
     end
 
-    page.boxxyAutoLootButton:setX(lootAllControl:getRight() + 6)
-    page.boxxyAutoLootButton:setY(lootAllControl:getY())
-    page.boxxyAutoLootButton:setHeight(lootAllControl:getHeight())
-    page.boxxyAutoLootButton:setWidthToTitle()
-    page.boxxyAutoLootButton:setEnable(BoxxyAutoLoot.hasTrackedItems(playerObj))
-    page.boxxyAutoLootButton.tooltip = BoxxyAutoLoot.hasTrackedItems(playerObj) and nil or
-        (BoxxyAutoLoot.hasAnyStoredEntries(playerObj) and "Enable auto loot entries first." or
-            "Add items to the auto loot list first.")
+    page.BoxxyQuickLootButton:setX(lootAllControl:getRight() + 6)
+    page.BoxxyQuickLootButton:setY(lootAllControl:getY())
+    page.BoxxyQuickLootButton:setHeight(lootAllControl:getHeight())
+    page.BoxxyQuickLootButton:setWidthToTitle()
+    local buttonEnabled, tooltip = BoxxyQuickLoot.getLootButtonState(playerObj, inventory)
+    BoxxyQuickLoot.applyLootButtonState(page.BoxxyQuickLootButton, buttonEnabled, tooltip)
 end
 
-function BoxxyAutoLoot.drawTrackedHighlights(pane, doDragged)
+function BoxxyQuickLoot.drawTrackedHighlights(pane, doDragged)
     if doDragged or not pane or not pane.inventoryPage or pane.inventoryPage.onCharacter then
         return
     end
 
     local playerObj = getSpecificPlayer(pane.player)
-    if not playerObj or not BoxxyAutoLoot.hasTrackedItems(playerObj) or type(pane.items) ~= "table" then
+    if not playerObj or not BoxxyQuickLoot.hasTrackedItems(playerObj) or type(pane.items) ~= "table" then
         return
     end
 
@@ -797,8 +1058,8 @@ function BoxxyAutoLoot.drawTrackedHighlights(pane, doDragged)
     local rowWidth = pane:getWidth() - pane.column2 - (pane:isVScrollBarVisible() and 14 or 2)
 
     for index, rowEntry in ipairs(pane.items) do
-        local item = BoxxyAutoLoot.getListRowItem(rowEntry)
-        if BoxxyAutoLoot.isTracked(playerObj, item) then
+        local item = BoxxyQuickLoot.getListRowItem(rowEntry)
+        if BoxxyQuickLoot.isTracked(playerObj, item) then
             local top = (index - 1) * pane.itemHgt + pane.headerHgt
             local scrolledTop = top + yScroll
             if scrolledTop + pane.itemHgt >= 0 and scrolledTop <= pane:getHeight() then
@@ -810,7 +1071,7 @@ function BoxxyAutoLoot.drawTrackedHighlights(pane, doDragged)
     end
 end
 
-function BoxxyAutoLoot.getEntryItem(entry)
+function BoxxyQuickLoot.getEntryItem(entry)
     if type(entry) ~= "table" or type(entry.items) ~= "table" then
         return nil
     end
@@ -824,13 +1085,13 @@ function BoxxyAutoLoot.getEntryItem(entry)
     return nil
 end
 
-function BoxxyAutoLoot.reorderTrackedEntries(pane)
+function BoxxyQuickLoot.reorderTrackedEntries(pane)
     if not pane or not pane.inventoryPage or pane.inventoryPage.onCharacter or type(pane.itemslist) ~= "table" then
         return
     end
 
     local playerObj = getSpecificPlayer(pane.player)
-    if not playerObj or not BoxxyAutoLoot.hasTrackedItems(playerObj) then
+    if not playerObj or not BoxxyQuickLoot.hasTrackedItems(playerObj) then
         return
     end
 
@@ -839,8 +1100,8 @@ function BoxxyAutoLoot.reorderTrackedEntries(pane)
     local otherEntries = {}
 
     for _, entry in ipairs(pane.itemslist) do
-        local item = BoxxyAutoLoot.getEntryItem(entry)
-        local isTracked = BoxxyAutoLoot.isTracked(playerObj, item)
+        local item = BoxxyQuickLoot.getEntryItem(entry)
+        local isTracked = BoxxyQuickLoot.isTracked(playerObj, item)
 
         if entry.matchesSearch then
             table.insert(searchMatches, entry)
@@ -866,84 +1127,315 @@ function BoxxyAutoLoot.reorderTrackedEntries(pane)
     end
 end
 
-function BoxxyAutoLoot.patchInventoryUi()
-    if BoxxyAutoLoot.isPatched then
+function BoxxyQuickLoot.patchInventoryUi()
+    if BoxxyQuickLoot.isPatched then
         return
     end
 
-    BoxxyAutoLoot.isPatched = true
-    BoxxyAutoLoot.emptyContextMenu = BoxxyAutoLoot.emptyContextMenu or {
+    BoxxyQuickLoot.isPatched = true
+    BoxxyQuickLoot.emptyContextMenu = BoxxyQuickLoot.emptyContextMenu or {
         isAnyVisible = function()
             return false
         end,
     }
 
-    if not BoxxyAutoLoot.originalGetPlayerContextMenu and type(getPlayerContextMenu) == "function" then
-        BoxxyAutoLoot.originalGetPlayerContextMenu = getPlayerContextMenu
+    if not BoxxyQuickLoot.originalGetPlayerContextMenu and type(getPlayerContextMenu) == "function" then
+        BoxxyQuickLoot.originalGetPlayerContextMenu = getPlayerContextMenu
         function getPlayerContextMenu(playerNum)
-            local contextMenu = BoxxyAutoLoot.originalGetPlayerContextMenu(playerNum)
+            local contextMenu = BoxxyQuickLoot.originalGetPlayerContextMenu(playerNum)
             if contextMenu ~= nil then
                 return contextMenu
             end
 
-            return BoxxyAutoLoot.emptyContextMenu
+            return BoxxyQuickLoot.emptyContextMenu
         end
     end
 
-    BoxxyAutoLoot.originalCreateChildren = ISInventoryPage.createChildren
-    BoxxyAutoLoot.originalPageUpdate = ISInventoryPage.update
-    BoxxyAutoLoot.originalRefreshContainer = ISInventoryPane.refreshContainer
-    BoxxyAutoLoot.originalRenderDetails = ISInventoryPane.renderdetails
+    BoxxyQuickLoot.originalCreateChildren = ISInventoryPage.createChildren
+    BoxxyQuickLoot.originalPageUpdate = ISInventoryPage.update
+    BoxxyQuickLoot.originalRefreshContainer = ISInventoryPane.refreshContainer
+    BoxxyQuickLoot.originalRenderDetails = ISInventoryPane.renderdetails
 
     function ISInventoryPage:createChildren()
-        BoxxyAutoLoot.originalCreateChildren(self)
-        BoxxyAutoLoot.attachLootButton(self)
+        BoxxyQuickLoot.originalCreateChildren(self)
+        BoxxyQuickLoot.attachLootButton(self)
     end
 
     function ISInventoryPage:update()
-        BoxxyAutoLoot.originalPageUpdate(self)
-        BoxxyAutoLoot.updateLootButton(self)
+        BoxxyQuickLoot.originalPageUpdate(self)
+        BoxxyQuickLoot.updateLootButton(self)
     end
 
     function ISInventoryPane:refreshContainer()
-        BoxxyAutoLoot.originalRefreshContainer(self)
-        BoxxyAutoLoot.reorderTrackedEntries(self)
+        BoxxyQuickLoot.originalRefreshContainer(self)
+        BoxxyQuickLoot.reorderTrackedEntries(self)
     end
 
     function ISInventoryPane:renderdetails(doDragged)
-        BoxxyAutoLoot.originalRenderDetails(self, doDragged)
-        BoxxyAutoLoot.drawTrackedHighlights(self, doDragged)
+        BoxxyQuickLoot.originalRenderDetails(self, doDragged)
+        BoxxyQuickLoot.drawTrackedHighlights(self, doDragged)
     end
 end
 
-function BoxxyAutoLoot.attachExistingLootPages()
-    BoxxyAutoLoot.registerCleanUIHandler()
+function BoxxyQuickLoot.attachExistingLootPages()
+    BoxxyQuickLoot.registerCleanUIHandler()
 
     for playerNum = 0, 3 do
         local lootPage = getPlayerLoot(playerNum)
         if lootPage then
-            BoxxyAutoLoot.attachLootButton(lootPage)
-            BoxxyAutoLoot.updateLootButton(lootPage)
+            BoxxyQuickLoot.attachLootButton(lootPage)
+            BoxxyQuickLoot.updateLootButton(lootPage)
         end
     end
 end
 
-function BoxxyAutoLootWindow:refreshList()
+function BoxxyQuickLoot.getListButtonPositions(listbox)
+    local buttonX = listbox:getWidth() - BoxxyQuickLootWindow.removeButtonWidth - BoxxyQuickLootWindow
+        .actionRightPadding
+    local toggleX = buttonX - BoxxyQuickLootWindow.toggleButtonWidth - BoxxyQuickLootWindow.actionButtonGap
+    return toggleX, buttonX
+end
+
+function BoxxyQuickLoot.getRowButtonColors(buttonType, isHovered, isDisabledAction)
+    if buttonType == "remove" then
+        if isHovered then
+            return 0.94, 0.45, 0.2, 0.2, 0.98, 0.85, 0.5, 0.5
+        end
+        return 0.9, 0.35, 0.16, 0.16, 0.94, 0.7, 0.35, 0.35
+    end
+
+    if isDisabledAction then
+        if isHovered then
+            return 0.92, 0.28, 0.28, 0.28, 0.96, 0.52, 0.52, 0.52
+        end
+        return 0.88, 0.2, 0.2, 0.2, 0.92, 0.4, 0.4, 0.4
+    end
+
+    if isHovered then
+        return 0.94, 0.32, 0.4, 0.32, 0.98, 0.62, 0.76, 0.62
+    end
+
+    return 0.9, 0.24, 0.3, 0.24, 0.94, 0.52, 0.66, 0.52
+end
+
+function BoxxyQuickLootWindow:updateAddTermButtonStyle(isEnabled)
+    if not self.addTermButton then
+        return
+    end
+
+    local button = self.addTermButton
+    if isEnabled then
+        button.backgroundColor.r = 0.24
+        button.backgroundColor.g = 0.35
+        button.backgroundColor.b = 0.24
+        button.backgroundColor.a = 0.94
+        button.backgroundColorMouseOver.r = 0.3
+        button.backgroundColorMouseOver.g = 0.44
+        button.backgroundColorMouseOver.b = 0.3
+        button.backgroundColorMouseOver.a = 0.98
+        button.borderColor.r = 0.52
+        button.borderColor.g = 0.68
+        button.borderColor.b = 0.52
+        button.borderColor.a = 0.9
+    else
+        button.backgroundColor.r = 0.18
+        button.backgroundColor.g = 0.18
+        button.backgroundColor.b = 0.18
+        button.backgroundColor.a = 0.85
+        button.backgroundColorMouseOver.r = 0.18
+        button.backgroundColorMouseOver.g = 0.18
+        button.backgroundColorMouseOver.b = 0.18
+        button.backgroundColorMouseOver.a = 0.85
+        button.borderColor.r = 0.36
+        button.borderColor.g = 0.36
+        button.borderColor.b = 0.36
+        button.borderColor.a = 0.9
+    end
+end
+
+function BoxxyQuickLootWindow:applyWindowSkin()
+    BoxxyQuickLoot.copyColor(self.backgroundColor, BoxxyQuickLootWindow.frameBackground)
+    BoxxyQuickLoot.copyColor(self.borderColor, BoxxyQuickLootWindow.frameBorder)
+
+    if self.titlebarbkgcolor then
+        BoxxyQuickLoot.copyColor(self.titlebarbkgcolor, BoxxyQuickLootWindow.titleBarBackground)
+    end
+
+    if self.titlebarfgcolor then
+        BoxxyQuickLoot.copyColor(self.titlebarfgcolor, BoxxyQuickLootWindow.titleText)
+    end
+
+    if self.helpButton then
+        BoxxyQuickLoot.applyButtonPalette(self.helpButton,
+            { r = 0.24, g = 0.24, b = 0.24, a = 0.92 },
+            { r = 0.34, g = 0.34, b = 0.34, a = 0.98 },
+            { r = 0.5, g = 0.5, b = 0.5, a = 0.9 },
+            BoxxyQuickLootWindow.titleText)
+    end
+
+    if self.customCloseButton then
+        BoxxyQuickLoot.applyButtonPalette(self.customCloseButton,
+            { r = 0.32, g = 0.17, b = 0.17, a = 0.95 },
+            { r = 0.45, g = 0.22, b = 0.22, a = 1.0 },
+            { r = 0.72, g = 0.4, b = 0.4, a = 0.95 },
+            BoxxyQuickLootWindow.titleText)
+    end
+
+    if self.closeButton then
+        self.closeButton:setVisible(false)
+        self.closeButton:setEnable(false)
+    end
+
+    if self.pinButton then
+        self.pinButton:setVisible(false)
+        self.pinButton:setEnable(false)
+    end
+
+    self.pin = true
+
+    if self.termEntry then
+        self.termEntry.backgroundColor = self.termEntry.backgroundColor or {}
+        self.termEntry.borderColor = self.termEntry.borderColor or {}
+        self.termEntry.textColor = self.termEntry.textColor or {}
+        BoxxyQuickLoot.copyColor(self.termEntry.backgroundColor, BoxxyQuickLootWindow.surfaceBackground)
+        BoxxyQuickLoot.copyColor(self.termEntry.borderColor, BoxxyQuickLootWindow.surfaceBorder)
+        BoxxyQuickLoot.copyColor(self.termEntry.textColor, BoxxyQuickLootWindow.titleText)
+    end
+
+    if self.listbox then
+        self.listbox.backgroundColor = self.listbox.backgroundColor or {}
+        self.listbox.borderColor = self.listbox.borderColor or {}
+        BoxxyQuickLoot.copyColor(self.listbox.backgroundColor, BoxxyQuickLootWindow.surfaceBackground)
+        BoxxyQuickLoot.copyColor(self.listbox.borderColor, BoxxyQuickLootWindow.surfaceBorder)
+
+        if self.listbox.vscroll then
+            self.listbox.vscroll.backgroundColor = self.listbox.vscroll.backgroundColor or {}
+            self.listbox.vscroll.borderColor = self.listbox.vscroll.borderColor or {}
+            BoxxyQuickLoot.copyColor(self.listbox.vscroll.backgroundColor, BoxxyQuickLootWindow.scrollbarBackground)
+            BoxxyQuickLoot.copyColor(self.listbox.vscroll.borderColor, BoxxyQuickLootWindow.scrollbarBorder)
+        end
+    end
+end
+
+function BoxxyQuickLootWindow:prerender()
+    ISPanel.prerender(self)
+
+    local titleBarHeight = self:titleBarHeight()
+    self:drawRect(0, 0, self.width, self.height,
+        BoxxyQuickLootWindow.frameBackground.a,
+        BoxxyQuickLootWindow.frameBackground.r,
+        BoxxyQuickLootWindow.frameBackground.g,
+        BoxxyQuickLootWindow.frameBackground.b)
+    self:drawRectBorder(0, 0, self.width, self.height,
+        BoxxyQuickLootWindow.frameBorder.a,
+        BoxxyQuickLootWindow.frameBorder.r,
+        BoxxyQuickLootWindow.frameBorder.g,
+        BoxxyQuickLootWindow.frameBorder.b)
+    self:drawRect(1, 1, self.width - 2, titleBarHeight,
+        BoxxyQuickLootWindow.titleBarBackground.a,
+        BoxxyQuickLootWindow.titleBarBackground.r,
+        BoxxyQuickLootWindow.titleBarBackground.g,
+        BoxxyQuickLootWindow.titleBarBackground.b)
+    self:drawRectBorder(1, 1, self.width - 2, titleBarHeight,
+        BoxxyQuickLootWindow.titleBarBorder.a,
+        BoxxyQuickLootWindow.titleBarBorder.r,
+        BoxxyQuickLootWindow.titleBarBorder.g,
+        BoxxyQuickLootWindow.titleBarBorder.b)
+    self:drawText(self.title or BoxxyQuickLoot.windowTitle, 10,
+        math.floor((titleBarHeight - FONT_HGT_MEDIUM) / 2) + 1,
+        BoxxyQuickLootWindow.titleText.r,
+        BoxxyQuickLootWindow.titleText.g,
+        BoxxyQuickLootWindow.titleText.b,
+        BoxxyQuickLootWindow.titleText.a,
+        UIFont.Medium)
+end
+
+function BoxxyQuickLootWindow:render()
+    local superRender = ISCollapsableWindow.render or ISPanel.render
+    if superRender then
+        superRender(self)
+    end
+    local gripSize = 12
+    local x = self.width - gripSize - 3
+    local y = self.height - gripSize - 3
+    self:drawRectBorder(x, y, gripSize, gripSize, 0.9, 0.45, 0.45, 0.45)
+    self:drawRect(x + 3, y + 8, 2, 2, 0.7, 0.72, 0.72, 0.72)
+    self:drawRect(x + 6, y + 5, 2, 2, 0.58, 0.62, 0.62, 0.62)
+    self:drawRect(x + 9, y + 2, 2, 2, 0.5, 0.56, 0.56, 0.56)
+end
+
+function BoxxyQuickLootWindow:onCustomCloseButtonClicked()
+    self:close()
+end
+
+function BoxxyQuickLootWindow:isOnResizeGrip(x, y)
+    local gripSize = 16
+    return x >= self.width - gripSize and y >= self.height - gripSize
+end
+
+function BoxxyQuickLootWindow:onMouseDown(x, y)
+    if self:isOnResizeGrip(x, y) then
+        self.isResizingCustom = true
+        return true
+    end
+    return ISCollapsableWindow.onMouseDown(self, x, y)
+end
+
+function BoxxyQuickLootWindow:onMouseMove(dx, dy)
+    if self.isResizingCustom then
+        local minWidth = 520
+        local minHeight = 300
+        self:setWidth(math.max(minWidth, self.width + dx))
+        self:setHeight(math.max(minHeight, self.height + dy))
+        return true
+    end
+    return ISCollapsableWindow.onMouseMove(self, dx, dy)
+end
+
+function BoxxyQuickLootWindow:onMouseMoveOutside(dx, dy)
+    if self.isResizingCustom then
+        local minWidth = 520
+        local minHeight = 300
+        self:setWidth(math.max(minWidth, self.width + dx))
+        self:setHeight(math.max(minHeight, self.height + dy))
+        return true
+    end
+    return ISCollapsableWindow.onMouseMoveOutside(self, dx, dy)
+end
+
+function BoxxyQuickLootWindow:onMouseUp(x, y)
+    if self.isResizingCustom then
+        self.isResizingCustom = false
+        return true
+    end
+    return ISCollapsableWindow.onMouseUp(self, x, y)
+end
+
+function BoxxyQuickLootWindow:onMouseUpOutside(x, y)
+    if self.isResizingCustom then
+        self.isResizingCustom = false
+        return true
+    end
+    return ISCollapsableWindow.onMouseUpOutside(self, x, y)
+end
+
+function BoxxyQuickLootWindow:refreshList()
     self.listbox:clear()
     self.listbox:setScrollHeight(0)
 
-    local entries = BoxxyAutoLoot.getSortedEntries(self.playerObj)
+    local entries = BoxxyQuickLoot.getSortedEntries(self.playerObj)
     if #entries == 0 then
         self.listbox:addItem("No items in the auto loot list.", { empty = true })
         return
     end
 
-    for _, entry in ipairs(entries) do
+    for index, entry in ipairs(entries) do
+        entry.rowIndex = index
         self.listbox:addItem(entry.name, entry)
     end
 end
 
-function BoxxyAutoLootWindow:onListMouseDown(x, y)
+function BoxxyQuickLootWindow:onListMouseDown(x, y)
     if #self.items == 0 then
         return
     end
@@ -955,18 +1447,17 @@ function BoxxyAutoLootWindow:onListMouseDown(x, y)
 
     local entry = self.items[row].item
     if entry and not entry.empty then
-        local toggleX = self:getWidth() - BoxxyAutoLootWindow.removeButtonWidth - BoxxyAutoLootWindow.toggleButtonWidth - 20
-        local removeX = self:getWidth() - BoxxyAutoLootWindow.removeButtonWidth - 12
-        if x >= toggleX and x <= toggleX + BoxxyAutoLootWindow.toggleButtonWidth then
-            BoxxyAutoLoot.toggleEntryEnabled(self.parentWindow.playerObj, entry)
+        local toggleX, removeX = BoxxyQuickLoot.getListButtonPositions(self)
+        if x >= toggleX and x <= toggleX + BoxxyQuickLootWindow.toggleButtonWidth then
+            BoxxyQuickLoot.toggleEntryEnabled(self.parentWindow.playerObj, entry)
             return
         end
 
-        if x >= removeX and x <= removeX + BoxxyAutoLootWindow.removeButtonWidth then
+        if x >= removeX and x <= removeX + BoxxyQuickLootWindow.removeButtonWidth then
             if entry.entryType == "term" then
-                BoxxyAutoLoot.removeSearchTerm(self.parentWindow.playerObj, entry.term)
+                BoxxyQuickLoot.removeSearchTerm(self.parentWindow.playerObj, entry.term)
             else
-                BoxxyAutoLoot.removeFullType(self.parentWindow.playerObj, entry.fullType)
+                BoxxyQuickLoot.removeFullType(self.parentWindow.playerObj, entry.fullType)
             end
             return
         end
@@ -975,13 +1466,29 @@ function BoxxyAutoLootWindow:onListMouseDown(x, y)
     return ISScrollingListBox.onMouseDown(self, x, y)
 end
 
-function BoxxyAutoLootWindow:doDrawItem(y, item, alt)
+function BoxxyQuickLootWindow:onListMouseMove(dx, dy)
+    self.hoverX = self:getMouseX()
+    self.hoverY = self:getMouseY()
+    return ISScrollingListBox.onMouseMove(self, dx, dy)
+end
+
+function BoxxyQuickLootWindow:onListMouseMoveOutside(dx, dy)
+    self.hoverX = nil
+    self.hoverY = nil
+    return ISScrollingListBox.onMouseMoveOutside(self, dx, dy)
+end
+
+function BoxxyQuickLootWindow:doDrawItem(y, item, alt)
     local entry = item.item
-    local backgroundAlpha = alt and 0.08 or 0.16
-    self:drawRect(0, y, self:getWidth(), item.height, backgroundAlpha, 0.0, 0.0, 0.0)
+    local isStripedRow = entry and entry.rowIndex and entry.rowIndex % 2 == 0
+    if isStripedRow then
+        self:drawRect(0, y, self:getWidth(), item.height, 0.9, 0.09, 0.1, 0.12)
+    else
+        self:drawRect(0, y, self:getWidth(), item.height, 0.9, 0.13, 0.14, 0.17)
+    end
 
     if self.items[self.selected] == item then
-        self:drawRect(0, y, self:getWidth(), item.height, 0.12, 1.0, 1.0, 1.0)
+        self:drawRect(0, y, self:getWidth(), item.height, 0.2, 0.88, 0.82, 0.56)
     end
 
     if entry and entry.empty then
@@ -990,33 +1497,53 @@ function BoxxyAutoLootWindow:doDrawItem(y, item, alt)
         return y + item.height
     end
 
-    local toggleX = self:getWidth() - BoxxyAutoLootWindow.removeButtonWidth - BoxxyAutoLootWindow.toggleButtonWidth - 20
-    local buttonX = self:getWidth() - BoxxyAutoLootWindow.removeButtonWidth - 12
+    local toggleX, buttonX = BoxxyQuickLoot.getListButtonPositions(self)
     local buttonY = y + 4
     local buttonH = item.height - 8
     local toggleLabel = entry.enabled == false and "Enable" or "Disable"
     local textAlpha = entry.enabled == false and 0.45 or 0.9
     local statusText = entry.enabled == false and " (Disabled)" or ""
+    local textX = 10
+    local isHoveringRow = self.hoverY ~= nil and self.hoverY >= y and self.hoverY <= y + item.height
+    local isHoveringToggle = isHoveringRow and self.hoverX ~= nil and self.hoverX >= toggleX and self.hoverX <= toggleX +
+        BoxxyQuickLootWindow.toggleButtonWidth
+    local isHoveringRemove = isHoveringRow and self.hoverX ~= nil and self.hoverX >= buttonX and self.hoverX <= buttonX +
+        BoxxyQuickLootWindow.removeButtonWidth
+    local toggleBackgroundA, toggleBackgroundR, toggleBackgroundG, toggleBackgroundB, toggleBorderA, toggleBorderR,
+    toggleBorderG, toggleBorderB = BoxxyQuickLoot.getRowButtonColors("toggle", isHoveringToggle, entry.enabled == false)
+    local removeBackgroundA, removeBackgroundR, removeBackgroundG, removeBackgroundB, removeBorderA, removeBorderR,
+    removeBorderG, removeBorderB = BoxxyQuickLoot.getRowButtonColors("remove", isHoveringRemove, false)
 
-    self:drawText(item.text .. statusText, 10, y + (item.height - FONT_HGT_SMALL) / 2, textAlpha, textAlpha, textAlpha,
+    if entry.entryType == "item" then
+        local iconTexture = BoxxyQuickLoot.getTextureFromPath(entry.icon)
+        if iconTexture and self.drawTextureScaledAspect2 then
+            local iconSize = math.min(item.height - 6, 20)
+            local iconY = y + math.floor((item.height - iconSize) / 2)
+            self:drawTextureScaledAspect2(iconTexture, textX, iconY, iconSize, iconSize, 1.0, 1.0, 1.0, textAlpha)
+            textX = textX + iconSize + 6
+        end
+    end
+
+    self:drawText(item.text .. statusText, textX, y + (item.height - FONT_HGT_SMALL) / 2, textAlpha, textAlpha,
+        textAlpha,
         1.0, UIFont.Small)
-    self:drawRect(toggleX, buttonY, BoxxyAutoLootWindow.toggleButtonWidth, buttonH,
-        0.20,
-        entry.enabled == false and 0.12 or 0.45,
-        entry.enabled == false and 0.45 or 0.25,
-        entry.enabled == false and 0.12 or 0.15)
-    self:drawRectBorder(toggleX, buttonY, BoxxyAutoLootWindow.toggleButtonWidth, buttonH, 0.45, 0.7, 0.7, 0.7)
-    self:drawTextCentre(toggleLabel, toggleX + BoxxyAutoLootWindow.toggleButtonWidth / 2,
+    self:drawRect(toggleX, buttonY, BoxxyQuickLootWindow.toggleButtonWidth, buttonH,
+        toggleBackgroundA, toggleBackgroundR, toggleBackgroundG, toggleBackgroundB)
+    self:drawRectBorder(toggleX, buttonY, BoxxyQuickLootWindow.toggleButtonWidth, buttonH, toggleBorderA, toggleBorderR,
+        toggleBorderG, toggleBorderB)
+    self:drawTextCentre(toggleLabel, toggleX + BoxxyQuickLootWindow.toggleButtonWidth / 2,
         y + (item.height - FONT_HGT_SMALL) / 2, 1.0, 0.9, 0.9, 0.9, UIFont.Small)
-    self:drawRect(buttonX, buttonY, BoxxyAutoLootWindow.removeButtonWidth, buttonH, 0.25, 0.55, 0.15, 0.15)
-    self:drawRectBorder(buttonX, buttonY, BoxxyAutoLootWindow.removeButtonWidth, buttonH, 0.45, 0.8, 0.25, 0.25)
-    self:drawTextCentre("Remove", buttonX + BoxxyAutoLootWindow.removeButtonWidth / 2,
+    self:drawRect(buttonX, buttonY, BoxxyQuickLootWindow.removeButtonWidth, buttonH, removeBackgroundA, removeBackgroundR,
+        removeBackgroundG, removeBackgroundB)
+    self:drawRectBorder(buttonX, buttonY, BoxxyQuickLootWindow.removeButtonWidth, buttonH, removeBorderA, removeBorderR,
+        removeBorderG, removeBorderB)
+    self:drawTextCentre("Remove", buttonX + BoxxyQuickLootWindow.removeButtonWidth / 2,
         y + (item.height - FONT_HGT_SMALL) / 2, 1.0, 0.9, 0.9, 0.9, UIFont.Small)
 
     return y + item.height
 end
 
-function BoxxyAutoLootWindow:update()
+function BoxxyQuickLootWindow:update()
     ISCollapsableWindow.update(self)
 
     if not self.playerObj then
@@ -1025,34 +1552,55 @@ function BoxxyAutoLootWindow:update()
     end
 
     if self.addTermButton and self.termEntry and self.termEntry.getInternalText then
-        local hasText = BoxxyAutoLoot.normalizeSearchTerm(self.termEntry:getInternalText()) ~= nil
+        local hasText = BoxxyQuickLoot.normalizeSearchTerm(self.termEntry:getInternalText()) ~= nil
         self.addTermButton:setEnable(hasText)
+        self:updateAddTermButtonStyle(hasText)
     end
 end
 
-function BoxxyAutoLootWindow:close()
-    if BoxxyAutoLoot.windows then
-        BoxxyAutoLoot.windows[self.playerNum] = nil
+function BoxxyQuickLootWindow:close()
+    if BoxxyQuickLoot.windows then
+        BoxxyQuickLoot.windows[self.playerNum] = nil
     end
     ISCollapsableWindow.close(self)
 end
 
-function BoxxyAutoLootWindow:addSearchTermFromInput()
+function BoxxyQuickLootWindow:addSearchTermFromInput()
     local term = self.termEntry and self.termEntry:getInternalText() or nil
-    if BoxxyAutoLoot.addSearchTerm(self.playerObj, term) then
+    if BoxxyQuickLoot.addSearchTerm(self.playerObj, term) then
         self.termEntry:setText("")
         self.termEntry:focus()
         self:refreshList()
     end
 end
 
-function BoxxyAutoLootWindow:initialise()
+function BoxxyQuickLootWindow:onHelpButtonClicked()
+end
+
+function BoxxyQuickLootWindow:initialise()
     ISCollapsableWindow.initialise(self)
 
     local padding = 10
     local titleBarHeight = self:titleBarHeight()
     local inputHeight = FONT_HGT_SMALL + 12
-    local buttonWidth = BoxxyAutoLootWindow.addTermButtonWidth
+    local buttonWidth = BoxxyQuickLootWindow.addTermButtonWidth
+    local helpButtonSize = BoxxyQuickLootWindow.helpButtonSize
+
+    self.customCloseButton = ISButton:new(self.width - 26, 1, helpButtonSize, titleBarHeight - 2, "X", self,
+        BoxxyQuickLootWindow.onCustomCloseButtonClicked)
+    self.customCloseButton:initialise()
+    self.customCloseButton:setAnchorRight(true)
+    self.customCloseButton:setAnchorTop(true)
+    self:addChild(self.customCloseButton)
+
+    self.helpButton = ISButton:new(self.width - 48, 1, helpButtonSize, titleBarHeight - 2, "?", self,
+        BoxxyQuickLootWindow.onHelpButtonClicked)
+    self.helpButton:initialise()
+    self.helpButton:setAnchorRight(true)
+    self.helpButton:setAnchorTop(true)
+    self.helpButton.tooltip = BoxxyQuickLoot.getMatchSyntaxTooltip()
+    self.helpButton.borderColor.a = 0.35
+    self:addChild(self.helpButton)
 
     self.termEntry = ISTextEntryBox:new("", padding, titleBarHeight + padding,
         self.width - padding * 3 - buttonWidth, inputHeight)
@@ -1063,7 +1611,7 @@ function BoxxyAutoLootWindow:initialise()
     self.termEntry:setAnchorTop(true)
     self.termEntry:setOnlyNumbers(false)
     self.termEntry:setMaxLines(1)
-    self.termEntry:setPlaceholderText('Add fuzzy match, e.g. "chips"')
+    self.termEntry:setPlaceholderText('Add match, e.g. "chips" or "baseball -bat"')
     self.termEntry.onCommandEntered = function(entry)
         entry.parentWindow:addSearchTermFromInput()
     end
@@ -1071,11 +1619,12 @@ function BoxxyAutoLootWindow:initialise()
     self:addChild(self.termEntry)
 
     self.addTermButton = ISButton:new(self.termEntry:getRight() + padding, self.termEntry.y, buttonWidth, inputHeight,
-        "Add Match", self, BoxxyAutoLootWindow.addSearchTermFromInput)
+        "Add Match", self, BoxxyQuickLootWindow.addSearchTermFromInput)
     self.addTermButton:initialise()
     self.addTermButton:setAnchorRight(true)
     self.addTermButton:setAnchorTop(true)
     self:addChild(self.addTermButton)
+    self:updateAddTermButtonStyle(false)
 
     self.listbox = ISScrollingListBox:new(padding, self.termEntry:getBottom() + padding, self.width - padding * 2,
         self.height - titleBarHeight - padding * 3 - inputHeight)
@@ -1086,16 +1635,20 @@ function BoxxyAutoLootWindow:initialise()
     self.listbox:setAnchorTop(true)
     self.listbox:setAnchorBottom(true)
     self.listbox.itemheight = FONT_HGT_SMALL + 12
-    self.listbox.doDrawItem = BoxxyAutoLootWindow.doDrawItem
-    self.listbox.onMouseDown = BoxxyAutoLootWindow.onListMouseDown
+    self.listbox.doDrawItem = BoxxyQuickLootWindow.doDrawItem
+    self.listbox.onMouseDown = BoxxyQuickLootWindow.onListMouseDown
+    self.listbox.onMouseMove = BoxxyQuickLootWindow.onListMouseMove
+    self.listbox.onMouseMoveOutside = BoxxyQuickLootWindow.onListMouseMoveOutside
     self.listbox.parentWindow = self
     self:addChild(self.listbox)
+
+    self:applyWindowSkin()
 
     self:refreshList()
 end
 
-function BoxxyAutoLootWindow:new(playerObj)
-    local width = 520
+function BoxxyQuickLootWindow:new(playerObj)
+    local width = 580
     local height = 390
     local x = (getCore():getScreenWidth() - width) / 2
     local y = (getCore():getScreenHeight() - height) / 2
@@ -1105,16 +1658,18 @@ function BoxxyAutoLootWindow:new(playerObj)
 
     o.playerObj = playerObj
     o.playerNum = playerObj:getPlayerNum()
-    o.title = BoxxyAutoLoot.windowTitle
-    o.resizable = true
+    o.title = BoxxyQuickLoot.windowTitle
+    o.resizable = false
     o.pin = true
+    o.backgroundColor = { r = 0.12, g = 0.12, b = 0.12, a = 0.96 }
+    o.borderColor = { r = 0.3, g = 0.3, b = 0.3, a = 1.0 }
 
     return o
 end
 
-BoxxyAutoLoot.patchInventoryUi()
-BoxxyAutoLoot.registerCleanUIHandler()
-Events.OnFillInventoryObjectContextMenu.Add(BoxxyAutoLoot.onFillInventoryObjectContextMenu)
-Events.OnGameBoot.Add(BoxxyAutoLoot.registerCleanUIHandler)
-Events.OnGameStart.Add(BoxxyAutoLoot.attachExistingLootPages)
-Events.OnKeyPressed.Add(BoxxyAutoLoot.onAutoLootKeyPressed)
+BoxxyQuickLoot.patchInventoryUi()
+BoxxyQuickLoot.registerCleanUIHandler()
+Events.OnFillInventoryObjectContextMenu.Add(BoxxyQuickLoot.onFillInventoryObjectContextMenu)
+Events.OnGameBoot.Add(BoxxyQuickLoot.registerCleanUIHandler)
+Events.OnGameStart.Add(BoxxyQuickLoot.attachExistingLootPages)
+Events.OnKeyPressed.Add(BoxxyQuickLoot.onAutoLootKeyPressed)

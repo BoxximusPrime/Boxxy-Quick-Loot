@@ -1,8 +1,7 @@
 name=Boxxy Quick Loot
-id=BoxxyAutoLoot
+id=BoxxyQuickLoot
 author=BoxxyPrime
 description=Adds a simple quick-loot list, loot highlights, and a one-click quick loot button to the loot window.
 poster=preview.png
 modversion=1.0.0
 versionMin=42.12
-versionMax=42.14

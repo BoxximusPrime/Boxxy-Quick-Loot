@@ -10,15 +10,15 @@ require "ISUI/ISTextEntryBox"
 require "ISUI/ISToolTip"
 
 BoxxyQuickLoot = BoxxyQuickLoot or {}
-BoxxyQuickLoot.modDataKey = "BoxxyQuickLoot"
-BoxxyQuickLoot.windowTitle = "Quick Loot"
+BoxxyQuickLoot.modDataKey = "BoxxyQuickLoots"
+BoxxyQuickLoot.windowTitle = "Quick Loots"
 BoxxyQuickLoot.windows = BoxxyQuickLoot.windows or {}
 
 if not BoxxyQuickLoot.options and PZAPI and PZAPI.ModOptions then
     BoxxyQuickLoot.options = PZAPI.ModOptions:create("BoxxyQuickLoot", "Boxxy Quick Loot")
     BoxxyQuickLoot.autoLootKeyOption = BoxxyQuickLoot.options:addKeyBind(
         "BoxxyQuickLoot_triggerAutoLoot",
-        "Quick Loot",
+        "Quick Loots",
         Keyboard.KEY_NONE,
         "Trigger Quick Loot on the active loot window."
     )
